@@ -114,6 +114,19 @@ def save_recipe(user_id: str, recipe: dict) -> None:
     get_client().table("saved_recipes").insert({"user_id": user_id, "recipe_json": recipe}).execute()
 
 
+def get_saved_recipes(user_id: str, limit: int = 10) -> list:
+    res = (
+        get_client()
+        .table("saved_recipes")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return res.data
+
+
 # ── usage_logs ─────────────────────────────────────────────────────────────
 
 def log_action(user_id: str, action: str, metadata: dict | None = None) -> None:

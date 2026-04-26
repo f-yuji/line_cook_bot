@@ -39,6 +39,7 @@ def _quick_reply() -> QuickReply:
         QuickReplyItem(action=MessageAction(label="買い足しなし", text="買い足しなし")),
         QuickReplyItem(action=MessageAction(label="買い足しあり", text="買い足しあり")),
         QuickReplyItem(action=MessageAction(label="買い物リスト", text="買い物リスト")),
+        QuickReplyItem(action=MessageAction(label="保存リスト", text="保存リスト")),
         QuickReplyItem(action=MessageAction(label="保存", text="保存")),
         QuickReplyItem(action=MessageAction(label="使い方", text="使い方")),
     ]
@@ -102,8 +103,25 @@ def handle_text_message(user_id: str, display_name: str, reply_token: str, text:
     if _check_active_and_reply(user, reply_token):
         return
 
-    # ── 写真確認フロー（pending） ──
+    # ── 保存リスト選択フロー ──
     pending = db.get_pending_ingredients(user_id)
+    if pending and pending.get("source") == "saved_list":
+        num = extract_number_from_text(text_s)
+        saved = pending["ingredients_json"]  # [{id, title}, ...]
+        if num and 1 <= num <= len(saved):
+            db.delete_pending_ingredients(user_id)
+            _handle_saved_detail(user, reply_token, saved[num - 1]["title"])
+            return
+        # 料理名で検索
+        matched = next((s for s in saved if s["title"] in text_s or text_s in s["title"]), None)
+        if matched:
+            db.delete_pending_ingredients(user_id)
+            _handle_saved_detail(user, reply_token, matched["title"])
+            return
+
+    # ── 写真確認フロー（pending） ──
+    if pending is None:
+        pending = db.get_pending_ingredients(user_id)
     if pending and pending.get("source") == "awaiting_confirm":
         if text_s == "この内容で提案":
             _propose_from_pending(user, reply_token)
@@ -135,6 +153,10 @@ def handle_text_message(user_id: str, display_name: str, reply_token: str, text:
 
     if text_s == "買い物リスト":
         _handle_shopping_list(user, reply_token)
+        return
+
+    if text_s == "保存リスト":
+        _handle_saved_list(user, reply_token)
         return
 
     if text_s in ("保存", "保存する") or re.match(r"^[1-3①②③]保存", text_s):
@@ -307,6 +329,34 @@ def _handle_save(user: dict, reply_token: str, text: str) -> None:
 
     db.log_action(user_id, "recipe_saved")
     _reply(reply_token, "保存しました。")
+
+
+def _handle_saved_list(user: dict, reply_token: str) -> None:
+    user_id = user["user_id"]
+    rows = db.get_saved_recipes(user_id)
+    if not rows:
+        _reply(reply_token, "保存済みのレシピはありません。\nレシピを見たあと「保存」と送ると保存できます。")
+        return
+
+    lines = ["【保存済みレシピ】\n"]
+    index = []
+    for i, row in enumerate(rows, 1):
+        title = row["recipe_json"].get("title", "不明")
+        lines.append(f"{i}. {title}")
+        index.append({"title": title})
+
+    lines.append("\n番号または料理名を送ると詳細を表示します。")
+    db.save_pending_ingredients(user_id, index, "saved_list")
+    _reply(reply_token, "\n".join(lines))
+
+
+def _handle_saved_detail(user: dict, reply_token: str, title: str) -> None:
+    detail = recipe_generator.generate_recipe_detail(title, "", user.get("family_size", 1))
+    if not detail:
+        _reply(reply_token, "詳細を取得できませんでした。もう一度試してください。")
+        return
+    db.log_action(user["user_id"], "saved_detail_viewed", {"title": title})
+    _reply(reply_token, format_detail_message(detail, user.get("family_size", 1)))
 
 
 def _handle_shopping_list(user: dict, reply_token: str) -> None:
