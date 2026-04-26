@@ -25,6 +25,12 @@ from linebot.v3.messaging import (
     QuickReply,
     QuickReplyItem,
     MessageAction,
+    FlexMessage,
+    FlexBubble,
+    FlexBox,
+    FlexText,
+    FlexButton,
+    FlexSeparator,
 )
 
 # ── LINE API クライアント ─────────────────────────────────────────────────
@@ -123,10 +129,10 @@ def handle_text_message(user_id: str, display_name: str, reply_token: str, text:
     if pending is None:
         pending = db.get_pending_ingredients(user_id)
     if pending and pending.get("source") == "awaiting_confirm":
-        if text_s == "この内容で提案":
+        if text_s in ("この内容で提案", "はい", "yes", "OK", "ok", "提案"):
             _propose_from_pending(user, reply_token)
             return
-        elif text_s == "食材を修正する":
+        elif text_s in ("食材を修正する", "修正"):
             db.save_pending_ingredients(user_id, pending["ingredients_json"], "awaiting_edit")
             _reply(reply_token, "修正した食材を送ってください。\n例：卵、キャベツ、ネギ、豆腐")
             return
@@ -198,20 +204,46 @@ def handle_image_message(user_id: str, display_name: str, reply_token: str, mess
     db.save_pending_ingredients(user_id, ingredients, "awaiting_confirm")
     db.log_action(user_id, "vision_success", {"count": len(ingredients)})
 
-    lines = ["写真からこの食材を見つけました。\n"]
-    for ing in ingredients:
-        lines.append(f"・{ing}")
-    lines.append("\nこの内容で提案しますか？")
-
-    # 確認ボタンをQuickReplyで出す
-    cfg = Configuration(access_token=config.LINE_CHANNEL_ACCESS_TOKEN)
-    api = MessagingApi(ApiClient(cfg))
-    qr = QuickReply(items=[
-        QuickReplyItem(action=MessageAction(label="この内容で提案", text="この内容で提案")),
-        QuickReplyItem(action=MessageAction(label="食材を修正する", text="食材を修正する")),
-    ])
-    msg = TextMessage(text="\n".join(lines), quick_reply=qr)
+    api = _get_line_api()
+    msg = _build_confirm_flex(ingredients)
     api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=[msg]))
+
+
+def _build_confirm_flex(ingredients: list) -> FlexMessage:
+    ing_texts = [FlexText(text=f"・{i}", size="sm", color="#333333") for i in ingredients]
+    return FlexMessage(
+        alt_text="食材を確認してください",
+        contents=FlexBubble(
+            header=FlexBox(
+                layout="vertical",
+                background_color="#27AE60",
+                padding_all="12px",
+                contents=[
+                    FlexText(text="📷 見つけた食材", color="#ffffff", weight="bold", size="md"),
+                ],
+            ),
+            body=FlexBox(
+                layout="vertical",
+                spacing="sm",
+                contents=ing_texts,
+            ),
+            footer=FlexBox(
+                layout="vertical",
+                spacing="sm",
+                contents=[
+                    FlexButton(
+                        action=MessageAction(label="この内容で提案する", text="この内容で提案"),
+                        style="primary",
+                        color="#27AE60",
+                    ),
+                    FlexButton(
+                        action=MessageAction(label="食材を修正する", text="食材を修正する"),
+                        style="secondary",
+                    ),
+                ],
+            ),
+        ),
+    )
 
 
 # ── 内部ハンドラ ─────────────────────────────────────────────────────────────
