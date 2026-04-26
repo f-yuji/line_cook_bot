@@ -124,7 +124,8 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
                 ),
             ],
         )
-        title_box = FlexText(text=title, weight="bold", size="md", wrap=True, margin="md")
+        title_box = FlexText(text=title, weight="bold", size="md", wrap=True,
+                             padding_start="12px", padding_end="12px", padding_top="10px")
     else:
         top_section = FlexBox(
             layout="vertical",
@@ -142,7 +143,10 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
     buy_color = "#E74C3C" if mode == "with_buy" else "#27AE60"
     subtitle = FlexBox(
         layout="horizontal",
-        margin="sm" if image_url else "md",
+        padding_start="12px",
+        padding_end="12px",
+        padding_top="10px",
+        padding_bottom="6px",
         contents=[
             FlexText(text="買い足し ", size="xs", color="#888888", flex=0),
             FlexBox(
@@ -158,7 +162,7 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
         ],
     )
 
-    body_contents = [top_section, subtitle]
+    body_contents = [subtitle, top_section]
     if title_box:
         body_contents.append(title_box)
 
@@ -166,7 +170,9 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
     body_contents.append(
         FlexBox(
             layout="horizontal",
-            margin="sm",
+            padding_start="12px",
+            padding_end="12px",
+            padding_top="8px",
             contents=[
                 FlexText(text=f"⏱ {time_min}分", size="sm", color="#555555", flex=1),
                 FlexText(text=f"💰 約{total_cost}円/1人分", size="sm", color="#555555", flex=1),
@@ -194,7 +200,9 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
                 background_color="#F5F5F5",
                 corner_radius="6px",
                 padding_all="8px",
-                margin="sm",
+                margin_start="12px",
+                margin_end="12px",
+                margin_top="8px",
                 contents=box_contents,
             )
         )
@@ -202,7 +210,8 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
     # 説明
     if desc:
         body_contents.append(
-            FlexText(text=desc, size="xs", color="#888888", wrap=True, margin="sm")
+            FlexText(text=desc, size="xs", color="#888888", wrap=True,
+                     padding_start="12px", padding_end="12px", padding_top="6px", padding_bottom="8px")
         )
 
     return FlexBubble(
