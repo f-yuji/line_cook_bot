@@ -232,6 +232,54 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
     )
 
 
+def build_detail_flex(detail: dict, family_size: int, image_url: str | None) -> FlexMessage:
+    title = detail.get("title", "レシピ")
+    ingredients = detail.get("ingredients", [])
+    steps = detail.get("steps", [])
+    tips = detail.get("tips", "")
+    storage = detail.get("storage", "")
+    next_day = detail.get("next_day_arrange", "")
+
+    body_contents = []
+
+    # タイトル
+    body_contents.append(
+        FlexText(text=f"【{title}】（{family_size}人分）", weight="bold", size="md",
+                 wrap=True, padding_bottom="8px")
+    )
+
+    # 材料
+    body_contents.append(FlexText(text="■ 材料", weight="bold", size="sm", color="#333333"))
+    for ing in ingredients:
+        body_contents.append(FlexText(text=f"・{ing}", size="sm", color="#555555", wrap=True))
+
+    # 作り方
+    body_contents.append(
+        FlexText(text="■ 作り方", weight="bold", size="sm", color="#333333", margin="md")
+    )
+    for i, step in enumerate(steps, 1):
+        body_contents.append(FlexText(text=f"{i}. {step}", size="sm", color="#555555", wrap=True))
+
+    # コツ・保存・翌日アレンジ
+    for icon, val in [("💡 コツ", tips), ("🗃 保存", storage), ("🔄 翌日アレンジ", next_day)]:
+        if val:
+            body_contents.append(
+                FlexText(text=f"{icon}：{val}", size="xs", color="#888888", wrap=True, margin="sm")
+            )
+
+    hero = FlexImage(
+        url=image_url, size="full", aspect_ratio="20:13", aspect_mode="cover"
+    ) if image_url else None
+
+    return FlexMessage(
+        alt_text=f"{title}の詳細レシピ",
+        contents=FlexBubble(
+            hero=hero,
+            body=FlexBox(layout="vertical", spacing="sm", contents=body_contents),
+        ),
+    )
+
+
 def build_recipes_flex(recipes: list, mode: str, family_size: int) -> FlexMessage:
     buy_label = "買い足しあり" if mode == "with_buy" else "買い足しなし"
     bubbles = [_recipe_bubble(r, i, mode, family_size) for i, r in enumerate(recipes[:3])]

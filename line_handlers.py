@@ -15,6 +15,7 @@ from utils import (
     format_shopping_list_message,
     extract_number_from_text,
     build_recipes_flex,
+    build_detail_flex,
     normalize_ingredients,
 )
 from linebot.v3.messaging import (
@@ -346,8 +347,7 @@ def _handle_detail(user: dict, reply_token: str, num: int) -> None:
 
     recipe = recipes[num - 1]
     title = recipe.get("title", "")
-    # 食材ヒントとして additional_items も含める
-    ingredients_hint = ", ".join(recipe.get("additional_items", []))
+    ingredients_hint = ", ".join(recipe.get("additional_ingredients", recipe.get("additional_items", [])))
 
     detail = recipe_generator.generate_recipe_detail(title, ingredients_hint, user.get("family_size", 1))
     if not detail:
@@ -355,21 +355,14 @@ def _handle_detail(user: dict, reply_token: str, num: int) -> None:
         return
 
     db.log_action(user_id, "detail_viewed", {"title": title})
-    detail_text = format_detail_message(detail, user.get("family_size", 1))
 
-    # 画像生成が有効なら画像URLも添付
-    image_prompt = recipe.get("image_prompt", title)
-    image_url = image_generator.generate_dish_image(image_prompt)
+    # コンテキストからキャッシュ済み画像URLを使い回す（新規生成しない）
+    image_url = recipe.get("image_url")
 
-    if image_url:
-        api = _get_line_api()
-        messages = [
-            TextMessage(text=detail_text),
-            ImageMessage(original_content_url=image_url, preview_image_url=image_url, quick_reply=_quick_reply()),
-        ]
-        api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=messages))
-    else:
-        _reply(reply_token, detail_text)
+    api = _get_line_api()
+    msg = build_detail_flex(detail, user.get("family_size", 1), image_url)
+    msg.quick_reply = _quick_reply()
+    api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=[msg]))
 
 
 def _handle_save(user: dict, reply_token: str, text: str) -> None:
