@@ -68,17 +68,6 @@ def generate_recipe_detail(title: str, ingredients_hint: str, family_size: int) 
     return data
 
 
-def generate_meal_plan(ingredients: str, family_size: int, nutrition_mode: str) -> list | None:
-    """週間献立を生成して返す。"""
-    data = _chat(
-        prompts.MEAL_PLAN_SYSTEM,
-        prompts.meal_plan_prompt(ingredients, family_size, nutrition_mode),
-    )
-    if data is None:
-        return None
-    return data.get("days", [])
-
-
 def generate_shopping_list(context: str) -> list | None:
     """買い物リストを生成して返す。"""
     data = _chat(prompts.SHOPPING_LIST_SYSTEM, prompts.shopping_list_prompt(context))

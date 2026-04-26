@@ -95,35 +95,6 @@ def leftover_prompt(leftovers: str, family_size: int) -> str:
 }}"""
 
 
-MEAL_PLAN_SYSTEM = """あなたは日本の家庭料理の専門家です。
-買い足しを最小限にした1週間の献立を提案します。
-必ず有効なJSONのみを返してください。"""
-
-
-def meal_plan_prompt(ingredients: str, family_size: int, nutrition_mode: str) -> str:
-    nutrition_instruction = {
-        "normal": "",
-        "healthy": "ヘルシー志向の献立にしてください。",
-        "hearty": "ボリューム重視の献立にしてください。",
-        "kids": "子供向けの献立にしてください。",
-        "high_protein": "高タンパクの献立にしてください。",
-        "diet": "ダイエット向けの献立にしてください。",
-    }.get(nutrition_mode, "")
-
-    return f"""手持ち食材：{ingredients if ingredients else "一般的な家庭の食材"}
-人数：{family_size}人分
-{nutrition_instruction}
-買い足しは週に2〜3品以内に抑えてください。
-
-以下のJSON形式で月〜日の7日分の夕食献立を返してください。
-
-{{
-  "days": [
-    {{"day": "月", "title": "料理名", "note": "買い足し少なめ"}}
-  ]
-}}"""
-
-
 SHOPPING_LIST_SYSTEM = """あなたは料理アシスタントです。
 レシピまたは献立から買い物リストを作成します。
 必ず有効なJSONのみを返してください。"""

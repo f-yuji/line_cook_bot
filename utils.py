@@ -79,19 +79,6 @@ def format_detail_message(detail: dict, family_size: int) -> str:
     return "\n".join(lines)
 
 
-def format_meal_plan_message(days: list) -> str:
-    lines = ["【今週の献立】\n"]
-    for d in days:
-        day = d.get("day", "")
-        title = d.get("title", "")
-        note = d.get("note", "")
-        line = f"{day}：{title}"
-        if note:
-            line += f"（{note}）"
-        lines.append(line)
-    return "\n".join(lines)
-
-
 def format_shopping_list_message(items: list) -> str:
     lines = ["【買い物リスト】\n"]
     for item in items:

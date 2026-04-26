@@ -12,7 +12,6 @@ import billing
 from utils import (
     format_recipes_message,
     format_detail_message,
-    format_meal_plan_message,
     format_shopping_list_message,
     extract_number_from_text,
     build_recipes_flex,
@@ -39,7 +38,6 @@ def _quick_reply() -> QuickReply:
     items = [
         QuickReplyItem(action=MessageAction(label="買い足しなし", text="買い足しなし")),
         QuickReplyItem(action=MessageAction(label="買い足しあり", text="買い足しあり")),
-        QuickReplyItem(action=MessageAction(label="週間献立", text="週間献立")),
         QuickReplyItem(action=MessageAction(label="買い物リスト", text="買い物リスト")),
         QuickReplyItem(action=MessageAction(label="保存", text="保存")),
         QuickReplyItem(action=MessageAction(label="使い方", text="使い方")),
@@ -133,10 +131,6 @@ def handle_text_message(user_id: str, display_name: str, reply_token: str, text:
     if text_s == "買い足しあり":
         db.upsert_user_field(user_id, {"mode": "with_buy"})
         _reply(reply_token, "買い足しありに変更しました。")
-        return
-
-    if text_s == "週間献立":
-        _handle_meal_plan(user, reply_token)
         return
 
     if text_s == "買い物リスト":
@@ -315,40 +309,16 @@ def _handle_save(user: dict, reply_token: str, text: str) -> None:
     _reply(reply_token, "保存しました。")
 
 
-def _handle_meal_plan(user: dict, reply_token: str) -> None:
-    user_id = user["user_id"]
-    ctx = db.get_latest_recipe_context(user_id)
-    ingredients = ""
-    if ctx:
-        titles = [r.get("title", "") for r in ctx["recipes_json"]]
-        ingredients = "、".join(titles)
-
-    days = recipe_generator.generate_meal_plan(
-        ingredients, user.get("family_size", 1), user.get("nutrition_mode", "normal")
-    )
-    if not days:
-        _reply(reply_token, "すみません、献立を生成できませんでした。\nもう一度試してください。")
-        return
-
-    db.save_meal_plan(user_id, days)
-    db.log_action(user_id, "meal_plan_generated")
-    _reply(reply_token, format_meal_plan_message(days))
-
-
 def _handle_shopping_list(user: dict, reply_token: str) -> None:
     user_id = user["user_id"]
 
     # 直近レシピまたは週間献立からコンテキストを作る
     ctx = db.get_latest_recipe_context(user_id)
-    plan = db.get_latest_meal_plan(user_id)
 
     context_parts = []
     if ctx:
         for r in ctx["recipes_json"]:
             context_parts.append(r.get("title", ""))
-    if plan:
-        for d in plan["plan_json"]:
-            context_parts.append(d.get("title", ""))
 
     if not context_parts:
         _reply(reply_token, "レシピか献立が見つかりません。\n先に食材を送ってください。")
@@ -376,7 +346,7 @@ def _usage_text() -> str:
         "▶ 買い足しあり/なしを切り替え\n"
         "クイックリプライで選べます。\n\n"
         "▶ その他\n"
-        "週間献立・買い物リスト・保存\n"
+        "買い物リスト・保存\n"
         "人数 3人 → 人数設定\n"
         "ヘルシー / ダイエット → モード変更"
     )

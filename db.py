@@ -127,25 +127,6 @@ def log_action(user_id: str, action: str, metadata: dict | None = None) -> None:
         print(f"[log_action error] {e}")
 
 
-# ── meal_plans ─────────────────────────────────────────────────────────────
-
-def save_meal_plan(user_id: str, plan: list) -> None:
-    get_client().table("meal_plans").insert({"user_id": user_id, "plan_json": plan}).execute()
-
-
-def get_latest_meal_plan(user_id: str) -> dict | None:
-    res = (
-        get_client()
-        .table("meal_plans")
-        .select("*")
-        .eq("user_id", user_id)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
-    return res.data[0] if res.data else None
-
-
 # ── Stripe ─────────────────────────────────────────────────────────────────
 
 def get_user_by_stripe_customer(customer_id: str) -> dict | None:
