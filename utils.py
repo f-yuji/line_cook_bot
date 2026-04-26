@@ -90,7 +90,8 @@ _BUBBLE_COLORS = ["#FF6B35", "#4ECDC4", "#45B7D1"]
 _NUMBERS = ["①", "②", "③"]
 
 
-def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexBubble:
+def _recipe_bubble(recipe: dict, idx: int, family_size: int) -> FlexBubble:
+    mode = recipe.get("mode", "no_buy")
     color = _BUBBLE_COLORS[idx]
     num_str = str(idx + 1)
     title = recipe.get("title", "レシピ")
@@ -280,11 +281,10 @@ def build_detail_flex(detail: dict, family_size: int, image_url: str | None) -> 
     )
 
 
-def build_recipes_flex(recipes: list, mode: str, family_size: int) -> FlexMessage:
-    buy_label = "買い足しあり" if mode == "with_buy" else "買い足しなし"
-    bubbles = [_recipe_bubble(r, i, mode, family_size) for i, r in enumerate(recipes[:3])]
+def build_recipes_flex(recipes: list, family_size: int) -> FlexMessage:
+    bubbles = [_recipe_bubble(r, i, family_size) for i, r in enumerate(recipes[:3])]
     return FlexMessage(
-        alt_text=f"買い足し【{buy_label}】レシピ3案",
+        alt_text="レシピ3案をご提案します",
         contents=FlexCarousel(contents=bubbles),
     )
 

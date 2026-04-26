@@ -45,8 +45,6 @@ def _get_line_api() -> MessagingApi:
 
 def _quick_reply() -> QuickReply:
     items = [
-        QuickReplyItem(action=MessageAction(label="買い足しなし", text="買い足しなし")),
-        QuickReplyItem(action=MessageAction(label="買い足しあり", text="買い足しあり")),
         QuickReplyItem(action=MessageAction(label="買い物リスト", text="買い物リスト")),
         QuickReplyItem(action=MessageAction(label="保存リスト", text="保存リスト")),
         QuickReplyItem(action=MessageAction(label="保存", text="保存")),
@@ -61,9 +59,9 @@ def _reply(reply_token: str, text: str) -> None:
     api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=[msg]))
 
 
-def _reply_flex(reply_token: str, recipes: list, mode: str, family_size: int) -> None:
+def _reply_flex(reply_token: str, recipes: list, family_size: int) -> None:
     api = _get_line_api()
-    msg = build_recipes_flex(recipes, mode, family_size)
+    msg = build_recipes_flex(recipes, family_size)
     msg.quick_reply = _quick_reply()
     api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=[msg]))
 
@@ -150,16 +148,6 @@ def handle_text_message(user_id: str, display_name: str, reply_token: str, text:
         return
 
     # ── 機能系コマンド ──
-    if text_s == "買い足しなし":
-        db.upsert_user_field(user_id, {"mode": "no_buy"})
-        _reply(reply_token, "買い足しなしに変更しました。")
-        return
-
-    if text_s == "買い足しあり":
-        db.upsert_user_field(user_id, {"mode": "with_buy"})
-        _reply(reply_token, "買い足しありに変更しました。")
-        return
-
     if text_s == "買い物リスト":
         _handle_shopping_list(user, reply_token)
         return
@@ -286,13 +274,12 @@ _DAILY_LIMITS = {"paid": 10, "trial": 3, "free_expired": 0}
 
 def _handle_ingredient_text(user: dict, reply_token: str, text: str) -> None:
     user_id = user["user_id"]
-    mode = user.get("mode", "no_buy")
     nutrition_mode = user.get("nutrition_mode", "normal")
     family_size = user.get("family_size", 1)
     normalized = normalize_ingredients(text)
 
     # ── ライブラリキャッシュ確認 ──
-    cached = db.find_similar_recipe(normalized, mode, nutrition_mode)
+    cached = db.find_similar_recipe(normalized, "mixed", nutrition_mode)
     if cached:
         recipes = cached["recipes_json"]
         db.increment_library_use_count(cached["id"])
@@ -304,7 +291,7 @@ def _handle_ingredient_text(user: dict, reply_token: str, text: str) -> None:
             _reply(reply_token, f"本日の新規レシピ生成は{limit}回までです。\n明日また試してください。")
             return
 
-        recipes = recipe_generator.generate_recipes(text, mode, family_size, nutrition_mode)
+        recipes = recipe_generator.generate_recipes(text, family_size, nutrition_mode)
         if not recipes:
             _reply(reply_token, "すみません、うまく作れませんでした。\n食材をもう一度送ってください。")
             db.log_action(user_id, "recipe_failed", {"input": text[:100]})
@@ -315,11 +302,11 @@ def _handle_ingredient_text(user: dict, reply_token: str, text: str) -> None:
                 prompt = recipe.get("image_prompt", recipe.get("title", ""))
                 recipe["image_url"] = image_generator.generate_dish_image(prompt)
 
-        db.save_recipe_library(normalized, mode, nutrition_mode, recipes)
+        db.save_recipe_library(normalized, "mixed", nutrition_mode, recipes)
         db.log_action(user_id, "recipe_generated_new", {"count": len(recipes)})
 
     db.save_recipe_context(user_id, recipes)
-    _reply_flex(reply_token, recipes, mode, family_size)
+    _reply_flex(reply_token, recipes, family_size)
 
 
 def _propose_from_pending(user: dict, reply_token: str) -> None:

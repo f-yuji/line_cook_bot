@@ -6,15 +6,9 @@ RECIPE_LIST_SYSTEM = """あなたは日本の家庭料理の専門家です。
 
 def recipe_list_prompt(
     ingredients: str,
-    mode: str,
     family_size: int,
     nutrition_mode: str,
 ) -> str:
-    buy_instruction = (
-        "入力食材だけで作れるレシピを3案提案してください。追加購入は不要です。"
-        if mode == "no_buy"
-        else "入力食材に追加1〜2品まで買い足してもよいレシピを3案提案してください。"
-    )
     nutrition_instruction = {
         "normal": "",
         "healthy": "ヘルシーで低カロリーなレシピを優先してください。",
@@ -26,15 +20,19 @@ def recipe_list_prompt(
 
     return f"""食材：{ingredients}
 人数：{family_size}人分
-{buy_instruction}
 {nutrition_instruction}
 
-以下のJSON形式で3案返してください。
+以下のルールで3案返してください。
+- 1番目・2番目：食材に1〜2品買い足すとより美味しくなるレシピ（mode: "with_buy"）
+- 3番目：今ある食材だけで作れるレシピ（mode: "no_buy"、additional_ingredients/seasonings は空）
+
+以下のJSON形式で返してください。
 
 {{
   "recipes": [
     {{
       "title": "料理名",
+      "mode": "with_buy",
       "time_min": 10,
       "cost_yen": 150,
       "description": "一言説明",

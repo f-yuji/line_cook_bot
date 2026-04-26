@@ -38,12 +38,10 @@ def _chat(system: str, user: str, retries: int = 2) -> dict | None:
 
 def generate_recipes(
     ingredients: str,
-    mode: str,
     family_size: int,
     nutrition_mode: str,
 ) -> list | None:
-    """レシピ一覧3案を生成して返す。"""
-    # 余り物っぽいキーワードを検出してプロンプトを切り替える
+    """レシピ一覧3案を生成して返す。①②買い足しあり、③買い足しなし固定。"""
     leftover_keywords = ["余", "残", "昨日", "アレンジ"]
     is_leftover = any(kw in ingredients for kw in leftover_keywords)
 
@@ -52,7 +50,7 @@ def generate_recipes(
     else:
         data = _chat(
             prompts.RECIPE_LIST_SYSTEM,
-            prompts.recipe_list_prompt(ingredients, mode, family_size, nutrition_mode),
+            prompts.recipe_list_prompt(ingredients, family_size, nutrition_mode),
         )
     if data is None:
         return None
