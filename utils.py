@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timezone
 from linebot.v3.messaging import (
     FlexMessage, FlexCarousel, FlexBubble, FlexBox, FlexText, FlexButton,
-    MessageAction,
+    FlexImage, MessageAction,
 )
 
 
@@ -122,7 +122,13 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
             )
         )
 
+    image_url = recipe.get("image_url")
+    hero = FlexImage(
+        url=image_url, size="full", aspect_ratio="20:13", aspect_mode="cover"
+    ) if image_url else None
+
     return FlexBubble(
+        hero=hero,
         header=FlexBox(
             layout="vertical",
             background_color=color,
@@ -154,6 +160,20 @@ def build_recipes_flex(recipes: list, mode: str, family_size: int) -> FlexMessag
         alt_text=f"買い足し【{buy_label}】レシピ3案",
         contents=FlexCarousel(contents=bubbles),
     )
+
+
+def normalize_ingredients(text: str) -> str:
+    items = re.split(r"[、,，\s]+", text.strip())
+    items = [i.strip().lower() for i in items if i.strip()]
+    return "、".join(sorted(set(items)))
+
+
+def jaccard_similarity(a: str, b: str) -> float:
+    set_a = set(re.split(r"[、,，\s]+", a.lower()))
+    set_b = set(re.split(r"[、,，\s]+", b.lower()))
+    if not set_a or not set_b:
+        return 0.0
+    return len(set_a & set_b) / len(set_a | set_b)
 
 
 def extract_number_from_text(text: str) -> int | None:

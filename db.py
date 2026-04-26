@@ -140,6 +140,65 @@ def log_action(user_id: str, action: str, metadata: dict | None = None) -> None:
         print(f"[log_action error] {e}")
 
 
+# ── recipe_library ────────────────────────────────────────────────────────
+
+def find_similar_recipe(
+    ingredients_normalized: str, mode: str, nutrition_mode: str, threshold: float = 0.6
+) -> dict | None:
+    from utils import jaccard_similarity
+    res = (
+        get_client()
+        .table("recipe_library")
+        .select("*")
+        .eq("mode", mode)
+        .eq("nutrition_mode", nutrition_mode)
+        .order("use_count", desc=True)
+        .limit(200)
+        .execute()
+    )
+    best, best_score = None, 0.0
+    for row in res.data:
+        score = jaccard_similarity(ingredients_normalized, row["ingredients_normalized"])
+        if score > best_score:
+            best_score, best = score, row
+    return best if best_score >= threshold else None
+
+
+def save_recipe_library(
+    ingredients_normalized: str, mode: str, nutrition_mode: str, recipes: list
+) -> None:
+    get_client().table("recipe_library").insert({
+        "ingredients_normalized": ingredients_normalized,
+        "mode": mode,
+        "nutrition_mode": nutrition_mode,
+        "recipes_json": recipes,
+    }).execute()
+
+
+def increment_library_use_count(library_id: str) -> None:
+    row = get_client().table("recipe_library").select("use_count").eq("id", library_id).execute()
+    if row.data:
+        new_count = (row.data[0]["use_count"] or 0) + 1
+        get_client().table("recipe_library").update({"use_count": new_count}).eq("id", library_id).execute()
+
+
+def count_new_generations_today(user_id: str) -> int:
+    from datetime import datetime, timezone, timedelta
+    jst = timezone(timedelta(hours=9))
+    today_start = datetime.now(jst).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_utc = today_start.astimezone(timezone.utc)
+    res = (
+        get_client()
+        .table("usage_logs")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .eq("action", "recipe_generated_new")
+        .gte("created_at", today_utc.isoformat())
+        .execute()
+    )
+    return res.count or 0
+
+
 # ── Stripe ─────────────────────────────────────────────────────────────────
 
 def get_user_by_stripe_customer(customer_id: str) -> dict | None:

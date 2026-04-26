@@ -15,6 +15,7 @@ from utils import (
     format_shopping_list_message,
     extract_number_from_text,
     build_recipes_flex,
+    normalize_ingredients,
 )
 from linebot.v3.messaging import (
     ApiClient,
@@ -279,22 +280,45 @@ def _handle_settings(user: dict, reply_token: str, text: str) -> bool:
     return False
 
 
+_DAILY_LIMITS = {"paid": 10, "trial": 3, "free_expired": 0}
+
+
 def _handle_ingredient_text(user: dict, reply_token: str, text: str) -> None:
     user_id = user["user_id"]
-    recipes = recipe_generator.generate_recipes(
-        text,
-        user.get("mode", "no_buy"),
-        user.get("family_size", 1),
-        user.get("nutrition_mode", "normal"),
-    )
-    if not recipes:
-        _reply(reply_token, "すみません、うまく作れませんでした。\n食材をもう一度送ってください。")
-        db.log_action(user_id, "recipe_failed", {"input": text[:100]})
-        return
+    mode = user.get("mode", "no_buy")
+    nutrition_mode = user.get("nutrition_mode", "normal")
+    family_size = user.get("family_size", 1)
+    normalized = normalize_ingredients(text)
+
+    # ── ライブラリキャッシュ確認 ──
+    cached = db.find_similar_recipe(normalized, mode, nutrition_mode)
+    if cached:
+        recipes = cached["recipes_json"]
+        db.increment_library_use_count(cached["id"])
+        db.log_action(user_id, "recipe_cache_hit")
+    else:
+        # ── 新規生成レート制限 ──
+        limit = _DAILY_LIMITS.get(user.get("plan", "trial"), 3)
+        if db.count_new_generations_today(user_id) >= limit:
+            _reply(reply_token, f"本日の新規レシピ生成は{limit}回までです。\n明日また試してください。")
+            return
+
+        recipes = recipe_generator.generate_recipes(text, mode, family_size, nutrition_mode)
+        if not recipes:
+            _reply(reply_token, "すみません、うまく作れませんでした。\n食材をもう一度送ってください。")
+            db.log_action(user_id, "recipe_failed", {"input": text[:100]})
+            return
+
+        if config.ENABLE_IMAGE_GENERATION:
+            for recipe in recipes:
+                prompt = recipe.get("image_prompt", recipe.get("title", ""))
+                recipe["image_url"] = image_generator.generate_dish_image(prompt)
+
+        db.save_recipe_library(normalized, mode, nutrition_mode, recipes)
+        db.log_action(user_id, "recipe_generated_new", {"count": len(recipes)})
 
     db.save_recipe_context(user_id, recipes)
-    db.log_action(user_id, "recipe_generated", {"count": len(recipes)})
-    _reply_flex(reply_token, recipes, user.get("mode", "no_buy"), user.get("family_size", 1))
+    _reply_flex(reply_token, recipes, mode, family_size)
 
 
 def _propose_from_pending(user: dict, reply_token: str) -> None:
