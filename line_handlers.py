@@ -22,6 +22,7 @@ from linebot.v3.messaging import (
     MessagingApi,
     ReplyMessageRequest,
     TextMessage,
+    ImageMessage,
     QuickReply,
     QuickReplyItem,
     MessageAction,
@@ -337,7 +338,12 @@ def _handle_detail(user: dict, reply_token: str, num: int) -> None:
     image_url = image_generator.generate_dish_image(image_prompt)
 
     if image_url:
-        _reply_multi(reply_token, [detail_text, f"完成イメージ：\n{image_url}"])
+        api = _get_line_api()
+        messages = [
+            TextMessage(text=detail_text),
+            ImageMessage(original_content_url=image_url, preview_image_url=image_url, quick_reply=_quick_reply()),
+        ]
+        api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=messages))
     else:
         _reply(reply_token, detail_text)
 
