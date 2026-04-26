@@ -189,8 +189,6 @@ def handle_image_message(user_id: str, display_name: str, reply_token: str, mess
         _reply(reply_token, "写真を取得できませんでした。\n食材名を文字で送ってください。")
         return
 
-    _reply(reply_token, "写真を解析中です…")
-
     ingredients = vision_analyzer.analyze_ingredients_from_image(image_bytes)
     if not ingredients:
         _reply(reply_token, "写真から食材を読み取れませんでした。\n食材名を文字で送ってください。")
