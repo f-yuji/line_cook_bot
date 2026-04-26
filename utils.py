@@ -86,7 +86,7 @@ def format_shopping_list_message(items: list) -> str:
     return "\n".join(lines)
 
 
-_BUBBLE_COLORS = ["#FF6B35", "#4ECDC4", "#45B7D1"]
+_BUBBLE_COLORS = ["#FF6B35", "#4ECDC4", "#F4C430"]
 _NUMBERS = ["①", "②", "③"]
 
 
