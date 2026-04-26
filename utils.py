@@ -92,58 +92,119 @@ _NUMBERS = ["①", "②", "③"]
 
 def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexBubble:
     color = _BUBBLE_COLORS[idx]
-    num = _NUMBERS[idx]
+    num_str = str(idx + 1)
     title = recipe.get("title", "レシピ")
     time_min = recipe.get("time_min", "?")
     cost = recipe.get("cost_yen", "?")
     desc = recipe.get("description", "")
     additional = recipe.get("additional_items", [])
+    image_url = recipe.get("image_url")
     total_cost = cost * family_size if isinstance(cost, int) else cost
 
-    body_contents = [
+    # 画像＋バッジオーバーレイ or カラーヘッダー
+    if image_url:
+        top_section = FlexBox(
+            layout="vertical",
+            contents=[
+                FlexImage(url=image_url, size="full", aspect_ratio="20:13", aspect_mode="cover"),
+                FlexBox(
+                    layout="vertical",
+                    position="absolute",
+                    offset_top="8px",
+                    offset_start="8px",
+                    background_color=color,
+                    corner_radius="16px",
+                    width="32px",
+                    height="32px",
+                    contents=[
+                        FlexText(text=num_str, color="#ffffff", weight="bold", size="sm",
+                                 align="center", gravity="center")
+                    ],
+                ),
+            ],
+        )
+        title_box = FlexText(text=title, weight="bold", size="md", wrap=True, margin="md")
+    else:
+        top_section = FlexBox(
+            layout="vertical",
+            background_color=color,
+            padding_all="12px",
+            contents=[
+                FlexText(text=num_str, color="#ffffff", size="xxl", weight="bold"),
+                FlexText(text=title, color="#ffffff", size="sm", weight="bold", wrap=True),
+            ],
+        )
+        title_box = None
+
+    # 買い足しラベル
+    buy_label = "あり" if mode == "with_buy" else "なし"
+    buy_color = "#E74C3C" if mode == "with_buy" else "#27AE60"
+    subtitle = FlexBox(
+        layout="horizontal",
+        margin="sm" if image_url else "md",
+        contents=[
+            FlexText(text="買い足し ", size="xs", color="#888888", flex=0),
+            FlexBox(
+                layout="vertical",
+                background_color=buy_color,
+                corner_radius="4px",
+                padding_start="5px",
+                padding_end="5px",
+                flex=0,
+                contents=[FlexText(text=buy_label, color="#ffffff", size="xxs", weight="bold")],
+            ),
+            FlexText(text=" のおすすめレシピ", size="xs", color="#888888", flex=0),
+        ],
+    )
+
+    body_contents = [top_section, subtitle]
+    if title_box:
+        body_contents.append(title_box)
+
+    # 時間・コスト
+    body_contents.append(
         FlexBox(
             layout="horizontal",
             margin="sm",
             contents=[
                 FlexText(text=f"⏱ {time_min}分", size="sm", color="#555555", flex=1),
-                FlexText(text=f"💰 約{total_cost}円/人", size="sm", color="#555555", flex=1),
+                FlexText(text=f"💰 約{total_cost}円/1人分", size="sm", color="#555555", flex=1),
             ],
         )
-    ]
+    )
+
+    # 追加購入ボックス
+    if additional and mode == "with_buy":
+        items_text = "　".join([f"・{a}" for a in additional])
+        body_contents.append(
+            FlexBox(
+                layout="vertical",
+                background_color="#F5F5F5",
+                corner_radius="6px",
+                padding_all="8px",
+                margin="sm",
+                contents=[
+                    FlexText(text="追加で買うもの", size="xs", color="#888888"),
+                    FlexText(text=items_text, size="xs", color="#333333", wrap=True, margin="xs"),
+                ],
+            )
+        )
+
+    # 説明
     if desc:
         body_contents.append(
             FlexText(text=desc, size="xs", color="#888888", wrap=True, margin="sm")
         )
-    if additional and mode == "with_buy":
-        body_contents.append(
-            FlexText(
-                text="買い足し：" + "・".join(additional),
-                size="xs", color="#E74C3C", wrap=True, margin="sm",
-            )
-        )
-
-    image_url = recipe.get("image_url")
-    hero = FlexImage(
-        url=image_url, size="full", aspect_ratio="20:13", aspect_mode="cover"
-    ) if image_url else None
 
     return FlexBubble(
-        hero=hero,
-        header=FlexBox(
-            layout="vertical",
-            background_color=color,
-            padding_all="12px",
-            contents=[
-                FlexText(text=num, color="#ffffff", size="xxl", weight="bold"),
-                FlexText(text=title, color="#ffffff", size="sm", weight="bold", wrap=True),
-            ],
-        ),
-        body=FlexBox(layout="vertical", contents=body_contents),
+        size="kilo",
+        body=FlexBox(layout="vertical", padding_all="0px", contents=body_contents),
         footer=FlexBox(
             layout="vertical",
+            padding_all="12px",
             contents=[
                 FlexButton(
-                    action=MessageAction(label="詳しく見る", text=str(idx + 1)),
+                    action=MessageAction(label="詳しく見る", text=num_str),
                     style="primary",
                     color=color,
                     height="sm",
