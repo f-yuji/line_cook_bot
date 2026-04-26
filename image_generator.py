@@ -20,10 +20,9 @@ def generate_dish_image(image_prompt: str) -> str | None:
         return None
     try:
         res = get_client().images.generate(
-            model="dall-e-3",
+            model="dall-e-2",
             prompt=f"Photo of {image_prompt}, Japanese home cooking style, appetizing, natural light",
-            size="1024x1024",
-            quality="standard",
+            size="256x256",
             n=1,
         )
         return res.data[0].url
