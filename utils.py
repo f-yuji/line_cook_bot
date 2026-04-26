@@ -97,7 +97,8 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
     time_min = recipe.get("time_min", "?")
     cost = recipe.get("cost_yen", "?")
     desc = recipe.get("description", "")
-    additional = recipe.get("additional_items", [])
+    additional = recipe.get("additional_ingredients", recipe.get("additional_items", []))
+    seasonings = recipe.get("additional_seasonings", [])
     image_url = recipe.get("image_url")
     total_cost = cost * family_size if isinstance(cost, int) else cost
 
@@ -174,8 +175,19 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
     )
 
     # 追加購入ボックス
-    if additional and mode == "with_buy":
-        items_text = "　".join([f"・{a}" for a in additional])
+    if mode == "with_buy" and (additional or seasonings):
+        box_contents = [FlexText(text="追加で買うもの", size="xs", color="#888888", weight="bold")]
+        if additional:
+            box_contents.append(
+                FlexText(text="　".join([f"・{a}" for a in additional]),
+                         size="xs", color="#333333", wrap=True, margin="xs")
+            )
+        if seasonings:
+            box_contents.append(FlexText(text="調味料", size="xs", color="#888888", weight="bold", margin="sm"))
+            box_contents.append(
+                FlexText(text="　".join([f"・{s}" for s in seasonings]),
+                         size="xs", color="#333333", wrap=True, margin="xs")
+            )
         body_contents.append(
             FlexBox(
                 layout="vertical",
@@ -183,10 +195,7 @@ def _recipe_bubble(recipe: dict, idx: int, mode: str, family_size: int) -> FlexB
                 corner_radius="6px",
                 padding_all="8px",
                 margin="sm",
-                contents=[
-                    FlexText(text="追加で買うもの", size="xs", color="#888888"),
-                    FlexText(text=items_text, size="xs", color="#333333", wrap=True, margin="xs"),
-                ],
+                contents=box_contents,
             )
         )
 

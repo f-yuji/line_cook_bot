@@ -38,13 +38,16 @@ def recipe_list_prompt(
       "time_min": 10,
       "cost_yen": 150,
       "description": "一言説明",
-      "additional_items": [],
+      "additional_ingredients": [],
+      "additional_seasonings": [],
       "image_prompt": "Japanese home cooking, dish name"
     }}
   ]
 }}
 
-概算コストは1人前の金額で入れてください。"""
+概算コストは1人前の金額で入れてください。
+additional_ingredients は野菜・肉・豆腐など食材のみ。
+additional_seasonings は調味料・だし・ソースなどのみ。"""
 
 
 RECIPE_DETAIL_SYSTEM = """あなたは日本の家庭料理の専門家です。
@@ -88,7 +91,8 @@ def leftover_prompt(leftovers: str, family_size: int) -> str:
       "time_min": 10,
       "cost_yen": 50,
       "description": "一言説明",
-      "additional_items": [],
+      "additional_ingredients": [],
+      "additional_seasonings": [],
       "image_prompt": "Japanese home cooking, leftover dish"
     }}
   ]
