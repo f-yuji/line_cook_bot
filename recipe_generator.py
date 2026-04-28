@@ -18,7 +18,7 @@ def _chat(system: str, user: str, retries: int = 2) -> dict | None:
     for attempt in range(retries + 1):
         try:
             res = get_client().chat.completions.create(
-                model="gpt-4o-mini",
+                model=config.OPENAI_TEXT_MODEL,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
@@ -41,17 +41,49 @@ def generate_recipes(
     family_size: int,
     nutrition_mode: str,
 ) -> list | None:
-    """レシピ一覧3案を生成して返す。①②買い足しあり、③買い足しなし固定。"""
+    """辞書ベース推薦 → GPT整形。辞書候補不足時はGPT生成にフォールバック。"""
     leftover_keywords = ["余", "残", "昨日", "アレンジ"]
     is_leftover = any(kw in ingredients for kw in leftover_keywords)
 
     if is_leftover:
         data = _chat(prompts.LEFTOVER_SYSTEM, prompts.leftover_prompt(ingredients, family_size))
-    else:
+        if data is None:
+            return None
+        return data.get("recipes", [])
+
+    # 辞書ベース推薦
+    try:
+        from services.recipe_recommender import build_candidates
+        result = build_candidates(ingredients)
+        candidates = result.get("candidates", [])
+    except Exception as e:
+        print(f"[recipe_generator] dict lookup failed: {e}")
+        candidates = []
+
+    if len(candidates) >= 3:
         data = _chat(
-            prompts.RECIPE_LIST_SYSTEM,
-            prompts.recipe_list_prompt(ingredients, family_size, nutrition_mode),
+            prompts.RECIPE_FORMAT_SYSTEM,
+            prompts.recipe_format_prompt(ingredients, family_size, candidates, nutrition_mode),
         )
+        if data and data.get("recipes"):
+            recipes = data["recipes"]
+            # slotや購入情報は辞書側を正としてバックフィルする
+            for r, c in zip(recipes, candidates):
+                r["slot"] = c.get("slot", r.get("slot", ""))
+                r["slot_label"] = c.get("slot_label", r.get("slot_label", ""))
+                r["mode"] = c.get("mode", r.get("mode", ""))
+                r["additional_ingredients"] = c.get("additional_ingredients", r.get("additional_ingredients", []))
+                r["additional_seasonings"] = c.get("seasonings", r.get("additional_seasonings", []))
+                if not r.get("image_prompt"):
+                    r["image_prompt"] = c.get("image_prompt", r.get("title", ""))
+            return recipes
+
+    # フォールバック: GPTがゼロから生成
+    print(f"[recipe_generator] dict insufficient ({len(candidates)} candidates), falling back to GPT")
+    data = _chat(
+        prompts.RECIPE_LIST_SYSTEM,
+        prompts.recipe_list_prompt(ingredients, family_size, nutrition_mode),
+    )
     if data is None:
         return None
     return data.get("recipes", [])

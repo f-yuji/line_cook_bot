@@ -1,0 +1,18 @@
+{
+  "pattern_fallback": {
+    "炒め物": "Japanese stir fry home cooking",
+    "丼もの": "Japanese rice bowl donburi",
+    "冷たい麺": "Japanese cold noodles",
+    "温かい麺": "Japanese hot noodle soup",
+    "焼き麺": "Japanese fried noodles",
+    "パスタ": "Japanese style pasta",
+    "スープ": "Japanese home cooking soup",
+    "みそ汁": "Japanese miso soup",
+    "焼き物": "Japanese grilled home cooking",
+    "煮物": "Japanese simmered dish",
+    "サラダ": "Japanese salad",
+    "和え物": "Japanese dressed dish",
+    "かけご飯": "Japanese rice bowl",
+    "default": "Japanese home cooking simple meal"
+  }
+}

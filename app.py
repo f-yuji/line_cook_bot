@@ -1,6 +1,4 @@
-import hashlib
-import hmac
-import base64
+import logging
 
 from flask import Flask, request, abort, jsonify
 
@@ -13,6 +11,8 @@ from linebot.v3.webhook import WebhookPayload
 from linebot.v3.exceptions import InvalidSignatureError
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 parser = WebhookParser(config.LINE_CHANNEL_SECRET)
 
@@ -28,18 +28,18 @@ def webhook():
         payload: WebhookPayload = parser.parse(body, signature, as_payload=True)
     except InvalidSignatureError:
         abort(400, "Invalid signature")
-    except Exception as e:
-        print(f"[app] webhook parse error: {e}")
+    except Exception:
+        logger.exception("[app] webhook parse error")
         abort(400)
 
-    try:
-        for event in payload.events:
-            if not isinstance(event, MessageEvent):
-                continue
+    for event in payload.events:
+        if not isinstance(event, MessageEvent):
+            continue
 
-            user_id = event.source.user_id
-            reply_token = event.reply_token
+        user_id = getattr(event.source, "user_id", None) or "unknown"
+        reply_token = event.reply_token
 
+        try:
             display_name = _get_display_name(user_id)
 
             if isinstance(event.message, TextMessageContent):
@@ -50,10 +50,17 @@ def webhook():
                 line_handlers.handle_image_message(
                     user_id, display_name, reply_token, event.message.id
                 )
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return "OK", 200
+        except Exception:
+            message_type = event.message.__class__.__name__ if event.message else "unknown"
+            logger.exception(
+                "[app] webhook handler error user_id=%s message_type=%s",
+                user_id,
+                message_type,
+            )
+            try:
+                line_handlers.reply_system_error(reply_token)
+            except Exception:
+                logger.exception("[app] failed to send system error reply user_id=%s", user_id)
 
     return "OK", 200
 
@@ -67,7 +74,7 @@ def _get_display_name(user_id: str) -> str:
         if res.ok:
             return res.json().get("displayName", user_id)
     except Exception:
-        pass
+        logger.exception("[app] failed to get LINE profile user_id=%s", user_id)
     return user_id
 
 

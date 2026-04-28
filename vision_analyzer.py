@@ -33,7 +33,7 @@ def analyze_ingredients_from_image(image_bytes: bytes) -> list | None:
     try:
         b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
         res = get_client().chat.completions.create(
-            model="gpt-4o",
+            model=config.OPENAI_VISION_MODEL,
             messages=[
                 {
                     "role": "user",

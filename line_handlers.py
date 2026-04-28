@@ -59,6 +59,10 @@ def _reply(reply_token: str, text: str) -> None:
     api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=[msg]))
 
 
+def reply_system_error(reply_token: str) -> None:
+    _reply(reply_token, "ごめん、内部エラーが起きました。\n少し時間をおいてもう一度試してください。")
+
+
 def _reply_flex(reply_token: str, recipes: list, family_size: int) -> None:
     api = _get_line_api()
     msg = build_recipes_flex(recipes, family_size)
@@ -148,6 +152,11 @@ def handle_text_message(user_id: str, display_name: str, reply_token: str, text:
         return
 
     # ── 機能系コマンド ──
+    m = re.match(r"^買い物リスト登録:([1-3])$", text_s)
+    if m:
+        _handle_toggle_shopping(user, reply_token, int(m.group(1)))
+        return
+
     if text_s == "買い物リスト":
         _handle_shopping_list(user, reply_token)
         return
@@ -345,9 +354,13 @@ def _handle_detail(user: dict, reply_token: str, num: int) -> None:
 
     # コンテキストからキャッシュ済み画像URLを使い回す（新規生成しない）
     image_url = recipe.get("image_url")
+    buy_items = recipe.get("additional_ingredients", []) + recipe.get("additional_seasonings", [])
 
     api = _get_line_api()
-    msg = build_detail_flex(detail, user.get("family_size", 1), image_url)
+    msg = build_detail_flex(
+        detail, user.get("family_size", 1), image_url,
+        recipe_num=num, show_shopping_button=bool(buy_items),
+    )
     msg.quick_reply = _quick_reply()
     api.reply_message(ReplyMessageRequest(reply_token=reply_token, messages=[msg]))
 
@@ -399,19 +412,55 @@ def _handle_saved_detail(user: dict, reply_token: str, title: str) -> None:
     _reply(reply_token, format_detail_message(detail, user.get("family_size", 1)))
 
 
+def _handle_toggle_shopping(user: dict, reply_token: str, num: int) -> None:
+    user_id = user["user_id"]
+    ctx = db.get_latest_recipe_context(user_id)
+    if not ctx or num < 1 or num > len(ctx["recipes_json"]):
+        _reply(reply_token, "レシピが見つかりません。")
+        return
+
+    recipe = ctx["recipes_json"][num - 1]
+    title = recipe.get("title", "")
+    items = recipe.get("additional_ingredients", []) + recipe.get("additional_seasonings", [])
+
+    added = db.toggle_pending_shopping(user_id, title, items)
+    if added:
+        db.log_action(user_id, "shopping_item_added", {"title": title})
+        _reply(reply_token, f"「{title}」を買い物リストに追加しました。\n「買い物リスト」で確認できます。")
+    else:
+        db.log_action(user_id, "shopping_item_removed", {"title": title})
+        _reply(reply_token, f"「{title}」を買い物リストから削除しました。")
+
+
 def _handle_shopping_list(user: dict, reply_token: str) -> None:
     user_id = user["user_id"]
 
-    # 直近レシピまたは週間献立からコンテキストを作る
-    ctx = db.get_latest_recipe_context(user_id)
+    # pendingの買い物リストがあればそれを返す
+    entries = db.get_pending_shopping(user_id)
+    if entries:
+        db.log_action(user_id, "shopping_list_from_pending")
+        lines = ["【今日の買い物リスト】\n"]
+        for entry in entries:
+            lines.append(f"🍽 {entry['title']}")
+            for item in entry["items"]:
+                lines.append(f"・{item}")
+            lines.append("")
+        _reply(reply_token, "\n".join(lines).strip())
+        return
 
+    # 従来のGPT生成フロー
+    ctx = db.get_latest_recipe_context(user_id)
     context_parts = []
     if ctx:
         for r in ctx["recipes_json"]:
-            context_parts.append(r.get("title", ""))
+            buy_items = r.get("additional_ingredients", []) + r.get("additional_seasonings", [])
+            if buy_items:
+                context_parts.append(f"{r.get('title', '')}: {', '.join(buy_items)}")
+            else:
+                context_parts.append(r.get("title", ""))
 
     if not context_parts:
-        _reply(reply_token, "レシピか献立が見つかりません。\n先に食材を送ってください。")
+        _reply(reply_token, "レシピが見つかりません。\n先に食材を送ってください。")
         return
 
     context_str = "\n".join(context_parts)

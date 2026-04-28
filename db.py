@@ -199,6 +199,41 @@ def count_new_generations_today(user_id: str) -> int:
     return res.count or 0
 
 
+# ── pending_shopping ──────────────────────────────────────────────────────
+
+def get_pending_shopping(user_id: str) -> list:
+    """当日JST分のエントリを返す。日付が変わっていれば自動クリアして空を返す。"""
+    jst = timezone(timedelta(hours=9))
+    res = get_client().table("pending_shopping").select("*").eq("user_id", user_id).execute()
+    if not res.data:
+        return []
+    row = res.data[0]
+    updated_at = datetime.fromisoformat(row["updated_at"])
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    if updated_at.astimezone(jst).date() < datetime.now(jst).date():
+        get_client().table("pending_shopping").delete().eq("user_id", user_id).execute()
+        return []
+    return row["entries_json"] or []
+
+
+def toggle_pending_shopping(user_id: str, title: str, items: list) -> bool:
+    """タイトルが未登録なら追加(True)、登録済みなら削除(False)を返す。"""
+    entries = get_pending_shopping(user_id)
+    if any(e["title"] == title for e in entries):
+        entries = [e for e in entries if e["title"] != title]
+        result = False
+    else:
+        entries.append({"title": title, "items": list(dict.fromkeys(items))})
+        result = True
+    get_client().table("pending_shopping").upsert({
+        "user_id": user_id,
+        "entries_json": entries,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }, on_conflict="user_id").execute()
+    return result
+
+
 # ── Stripe ─────────────────────────────────────────────────────────────────
 
 def get_user_by_stripe_customer(customer_id: str) -> dict | None:

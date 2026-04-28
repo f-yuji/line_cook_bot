@@ -90,11 +90,21 @@ _BUBBLE_COLORS = ["#FF6B35", "#4ECDC4", "#F4C430"]
 _NUMBERS = ["①", "②", "③"]
 
 
+def _short_join(items: list, limit: int = 4) -> str:
+    visible = [str(i) for i in items[:limit]]
+    rest = len(items) - len(visible)
+    text = " / ".join(visible)
+    if rest > 0:
+        text = f"{text} ほか{rest}件"
+    return text
+
+
 def _recipe_bubble(recipe: dict, idx: int, family_size: int) -> FlexBubble:
     mode = recipe.get("mode", "no_buy")
     color = _BUBBLE_COLORS[idx]
     num_str = str(idx + 1)
     title = recipe.get("title", "レシピ")
+    slot_label = recipe.get("slot_label", "")
     time_min = recipe.get("time_min", "?")
     cost = recipe.get("cost_yen", "?")
     desc = recipe.get("description", "")
@@ -102,6 +112,7 @@ def _recipe_bubble(recipe: dict, idx: int, family_size: int) -> FlexBubble:
     seasonings = recipe.get("additional_seasonings", [])
     image_url = recipe.get("image_url")
     total_cost = cost * family_size if isinstance(cost, int) else cost
+    cost_label = f"約{total_cost}円" if isinstance(total_cost, int) else f"約{total_cost}"
 
     # 画像＋バッジオーバーレイ or カラーヘッダー
     if image_url:
@@ -149,7 +160,7 @@ def _recipe_bubble(recipe: dict, idx: int, family_size: int) -> FlexBubble:
         padding_top="10px",
         padding_bottom="6px",
         contents=[
-            FlexText(text="買い足し ", size="xs", color="#888888", flex=0),
+            FlexText(text=f"{slot_label} / 買い足し " if slot_label else "買い足し ", size="xs", color="#888888", flex=0),
             FlexBox(
                 layout="vertical",
                 background_color=buy_color,
@@ -159,11 +170,11 @@ def _recipe_bubble(recipe: dict, idx: int, family_size: int) -> FlexBubble:
                 flex=0,
                 contents=[FlexText(text=buy_label, color="#ffffff", size="xxs", weight="bold")],
             ),
-            FlexText(text=" のおすすめレシピ", size="xs", color="#888888", flex=0),
+            FlexText(text=" のレシピ", size="xs", color="#888888", flex=0),
         ],
     )
 
-    body_contents = [subtitle, top_section]
+    body_contents = [top_section, subtitle]
     if title_box:
         body_contents.append(title_box)
 
@@ -171,30 +182,49 @@ def _recipe_bubble(recipe: dict, idx: int, family_size: int) -> FlexBubble:
     body_contents.append(
         FlexBox(
             layout="horizontal",
+            spacing="md",
             padding_start="12px",
             padding_end="12px",
             padding_top="8px",
             contents=[
-                FlexText(text=f"⏱ {time_min}分", size="sm", color="#555555", flex=1),
-                FlexText(text=f"💰 約{total_cost}円/1人分", size="sm", color="#555555", flex=1),
+                FlexText(text=f"時間 {time_min}分", size="xs", color="#555555", flex=1),
+                FlexText(text=f"目安 {cost_label}", size="xs", color="#555555", flex=1, align="end"),
             ],
         )
     )
 
-    # 追加購入ボックス
+    # 追加購入ボックス（with_buy）or 調味料ボックス（no_buy）
     if mode == "with_buy" and (additional or seasonings):
         box_contents = [FlexText(text="追加で買うもの", size="xs", color="#888888", weight="bold")]
         if additional:
             box_contents.append(
-                FlexText(text="　".join([f"・{a}" for a in additional]),
+                FlexText(text=_short_join(additional),
                          size="xs", color="#333333", wrap=True, margin="xs")
             )
         if seasonings:
             box_contents.append(FlexText(text="調味料", size="xs", color="#888888", weight="bold", margin="sm"))
             box_contents.append(
-                FlexText(text="　".join([f"・{s}" for s in seasonings]),
+                FlexText(text=_short_join(seasonings),
                          size="xs", color="#333333", wrap=True, margin="xs")
             )
+        body_contents.append(
+            FlexBox(
+                layout="vertical",
+                background_color="#F5F5F5",
+                corner_radius="6px",
+                padding_all="8px",
+                margin_start="12px",
+                margin_end="12px",
+                margin_top="8px",
+                contents=box_contents,
+            )
+        )
+    elif mode == "no_buy" and seasonings:
+        box_contents = [
+            FlexText(text="調味料", size="xs", color="#888888", weight="bold"),
+            FlexText(text=_short_join(seasonings),
+                     size="xs", color="#333333", wrap=True, margin="xs"),
+        ]
         body_contents.append(
             FlexBox(
                 layout="vertical",
@@ -233,7 +263,10 @@ def _recipe_bubble(recipe: dict, idx: int, family_size: int) -> FlexBubble:
     )
 
 
-def build_detail_flex(detail: dict, family_size: int, image_url: str | None) -> FlexMessage:
+def build_detail_flex(
+    detail: dict, family_size: int, image_url: str | None,
+    recipe_num: int | None = None, show_shopping_button: bool = False,
+) -> FlexMessage:
     title = detail.get("title", "レシピ")
     ingredients = detail.get("ingredients", [])
     steps = detail.get("steps", [])
@@ -272,11 +305,36 @@ def build_detail_flex(detail: dict, family_size: int, image_url: str | None) -> 
         url=image_url, size="full", aspect_ratio="20:13", aspect_mode="cover"
     ) if image_url else None
 
+    footer = None
+    if show_shopping_button and recipe_num is not None:
+        footer = FlexBox(
+            layout="vertical",
+            padding_all="12px",
+            spacing="xs",
+            contents=[
+                FlexButton(
+                    action=MessageAction(
+                        label="買い物リストに登録",
+                        text=f"買い物リスト登録:{recipe_num}",
+                    ),
+                    style="secondary",
+                    height="sm",
+                ),
+                FlexText(
+                    text="削除したいときはもう一度タップ",
+                    size="xxs",
+                    color="#AAAAAA",
+                    align="center",
+                ),
+            ],
+        )
+
     return FlexMessage(
         alt_text=f"{title}の詳細レシピ",
         contents=FlexBubble(
             hero=hero,
             body=FlexBox(layout="vertical", spacing="sm", contents=body_contents),
+            footer=footer,
         ),
     )
 

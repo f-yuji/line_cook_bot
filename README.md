@@ -60,6 +60,9 @@ STRIPE_PRICE_ID=price_xxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxx
 APP_BASE_URL=https://your-app.onrender.com
 ENABLE_IMAGE_GENERATION=false
+OPENAI_TEXT_MODEL=gpt-4o
+OPENAI_VISION_MODEL=gpt-4o
+OPENAI_IMAGE_MODEL=dall-e-3
 ```
 
 ---
@@ -129,6 +132,26 @@ create table if not exists meal_plans (
   created_at timestamptz default now()
 );
 create index on meal_plans (user_id, created_at desc);
+
+-- recipe_library
+create table if not exists recipe_library (
+  id                     uuid primary key default gen_random_uuid(),
+  ingredients_normalized text not null,
+  mode                   text not null default 'mixed',
+  nutrition_mode         text not null default 'normal',
+  recipes_json           jsonb not null,
+  use_count              integer not null default 0,
+  created_at             timestamptz default now(),
+  updated_at             timestamptz default now()
+);
+create index on recipe_library (mode, nutrition_mode, use_count desc);
+
+-- pending_shopping
+create table if not exists pending_shopping (
+  user_id      text primary key,
+  entries_json jsonb not null default '[]'::jsonb,
+  updated_at   timestamptz default now()
+);
 ```
 
 ---
